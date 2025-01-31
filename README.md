@@ -19,11 +19,7 @@ pip install -r requirements.txt
 ```
 
 2. 配置环境变量:
-创建
-
-.env
-
- 文件并配置以下变量:
+创建 `.env` 文件并配置以下变量:
 
 ```text
 OPENAI_API_ENDPOINT=你的API地址
