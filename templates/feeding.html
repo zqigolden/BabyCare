@@ -1,0 +1,176 @@
+{% extends "bootstrap/base.html" %}
+{% block title %}喂奶记录{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>喂奶计时器</h2>
+    
+    <div class="row mt-4">
+        <!-- 左侧计时器 -->
+        <div class="col-6">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h3>左侧</h3>
+                    <div class="display-4" id="leftTimer">00:00</div>
+                    <div class="btn-group mt-3">
+                        <button class="btn btn-lg btn-primary" id="leftBtn" onclick="toggleTimer('left')">
+                            开始
+                        </button>
+                        <button class="btn btn-lg btn-outline-secondary" onclick="resetSideTimer('left')">
+                            清零
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- 右侧计时器 -->
+        <div class="col-6">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h3>右侧</h3>
+                    <div class="display-4" id="rightTimer">00:00</div>
+                    <div class="btn-group mt-3">
+                        <button class="btn btn-lg btn-primary" id="rightBtn" onclick="toggleTimer('right')">
+                            开始
+                        </button>
+                        <button class="btn btn-lg btn-outline-secondary" onclick="resetSideTimer('right')">
+                            清零
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 总结卡片 -->
+    <div class="card mt-4">
+        <div class="card-body">
+            <h4>本次喂奶总结</h4>
+            <p>总时长: <span id="totalTime">0</span> 分钟</p>
+            <p>左侧: <span id="leftTotal">0</span> 分钟</p>
+            <p>右侧: <span id="rightTotal">0</span> 分钟</p>
+            <p>最后喂养: <span id="lastSide">-</span></p>
+            <button class="btn btn-success" onclick="saveFeeding()">保存记录</button>
+            <a href="/" class="btn btn-outline-secondary">返回主页</a>
+        </div>
+    </div>
+</div>
+
+<script>
+let timers = {
+    left: { running: false, time: 0 },
+    right: { running: false, time: 0 }
+};
+
+// 定期从服务器获取状态
+function updateFromServer() {
+    fetch('/timer/state')
+        .then(response => response.json())
+        .then(state => {
+            // 更新计时器状态
+            for (const [side, data] of Object.entries(state)) {
+                if (side !== 'last_side') {
+                    timers[side].running = data.running;
+                    timers[side].time = data.time;
+                    updateButtonState(side);
+                    updateDisplay(side);
+                }
+            }
+            // 更新最后喂养侧
+            updateLastSide(state.last_side);
+            // 更新总结
+            updateSummary();
+        });
+}
+
+function toggleTimer(side) {
+    fetch(`/timer/toggle/${side}`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateFromServer();
+        }
+    });
+}
+
+function updateButtonState(side) {
+    const btn = document.getElementById(`${side}Btn`);
+    if (timers[side].running) {
+        btn.textContent = '停止';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-danger');
+    } else {
+        btn.textContent = '开始';
+        btn.classList.remove('btn-danger');
+        btn.classList.add('btn-primary');
+    }
+}
+
+function updateDisplay(side) {
+    const minutes = Math.floor(timers[side].time / 60);
+    const seconds = timers[side].time % 60;
+    document.getElementById(`${side}Timer`).textContent = 
+        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function updateLastSide(lastSide) {
+    document.getElementById('lastSide').textContent = 
+        lastSide ? `${lastSide}侧` : '-';
+}
+
+function updateSummary() {
+    const leftMinutes = Math.floor(timers.left.time / 60);
+    const rightMinutes = Math.floor(timers.right.time / 60);
+    document.getElementById('totalTime').textContent = leftMinutes + rightMinutes;
+    document.getElementById('leftTotal').textContent = leftMinutes;
+    document.getElementById('rightTotal').textContent = rightMinutes;
+}
+
+// 添加单侧清零函数
+function resetSideTimer(side) {
+    fetch(`/timer/reset/${side}`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateFromServer();
+        }
+    });
+}
+
+function saveFeeding() {
+    const totalMinutes = Math.floor((timers.left.time + timers.right.time) / 60);
+    const notes = `左侧: ${Math.floor(timers.left.time/60)}分钟, ` +
+                 `右侧: ${Math.floor(timers.right.time/60)}分钟, ` +
+                 `最后喂养: ${document.getElementById('lastSide').textContent}`;
+    
+    const formData = new FormData();
+    formData.append('type', '吃奶');
+    formData.append('duration', totalMinutes);
+    formData.append('notes', notes);
+    
+    fetch('/add_event', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(() => {
+        // 保存成功后重置计时器
+        return fetch('/timer/reset', {
+            method: 'POST'
+        });
+    })
+    .then(() => window.location.href = '/')
+    .catch(error => console.error('Error:', error));
+}
+
+// 页面加载完成后开始定期更新
+document.addEventListener('DOMContentLoaded', function() {
+    updateFromServer();
+    setInterval(updateFromServer, 1000);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,290 @@
+{% extends "bootstrap/base.html" %}
+{% from 'bootstrap5/utils.html' import render_icon %}
+
+{% block title %}BabyCare 时间轴{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>宝宝作息记录</h2>
+    
+    <!-- 事件记录表单 -->
+    <form class="mb-4" onsubmit="return submitEvent()">
+        <select class="form-select mb-2" id="type">
+            <!-- 基础生理需求 -->
+            <option value="吃奶">吃奶</option>
+            <option value="睡眠">睡眠</option>
+            <option value="换尿布">换尿布</option>
+            
+            <!-- 卫生护理 -->
+            <option value="洗澡">洗澡</option>
+            <option value="剪指甲">剪指甲</option>
+            
+            <!-- 健康相关 -->
+            <option value="吃药">吃药</option>
+            <option value="体温测量">体温测量</option>
+            <option value="打疫苗">打疫苗</option>
+            
+            <!-- 成长记录 -->
+            <option value="体重测量">体重测量</option>
+            <option value="身高测量">身高测量</option>
+            
+            <!-- 互动活动 -->
+            <option value="户外活动">户外活动</option>
+            <option value="亲子游戏">亲子游戏</option>
+            
+            <!-- 其他 -->
+            <option value="其他">其他</option>
+        </select>
+        
+        <!-- 添加时间选择器 -->
+        <input type="datetime-local" class="form-control mb-2" 
+               id="eventTime" 
+               max="{{ datetime.now().strftime('%Y-%m-%dT%H:%M') }}">
+        
+        <div id="durationGroup">
+            <input type="number" class="form-control mb-2" 
+                   id="duration" placeholder="持续时间（分钟）">
+        </div>
+        
+        <textarea class="form-control mb-2" 
+                  id="notes" placeholder="备注"></textarea>
+        
+        <!-- 在表单提交按钮旁添加 -->
+        <div class="btn-group">
+            <button type="submit" class="btn btn-primary">记录事件</button>
+            <button type="button" class="btn btn-secondary" onclick="resetForm()">取消</button>
+        </div>
+    </form>
+
+    <!-- 在表单中添加跳转按钮 -->
+    <div class="mb-3">
+        <a href="/feeding" class="btn btn-info">
+            使用喂奶计时器 🍼
+        </a>
+    </div>
+
+    <!-- 在记录事件表单下方添加时间范围选择器 -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5>时间范围</h5>
+        <select class="form-select w-auto" id="timeRange" onchange="updateTimeRange()">
+            <option value="24">最近24小时</option>
+            <option value="48">最近48小时</option>
+            <option value="72">最近3天</option>
+            <option value="168">最近7天</option>
+        </select>
+    </div>
+
+    <!-- 事件时间轴 -->
+    <div class="list-group">
+        {% for event in events %}
+        <div class="list-group-item d-flex justify-content-between align-items-start">
+            <div>
+                <h5>{{ event.event_type }}</h5>
+                <small>{{ event.start_time|strftime('%Y-%m-%d %H:%M') }}</small>
+                {% if event.duration|convert_int > 0 %}
+                    <small class="ms-2">
+                        <i class="bi bi-clock"></i> {{ event.duration }}分钟
+                    </small>
+                {% endif %}
+                <p class="mb-0">{{ event.notes }}</p>
+            </div>
+            <div>
+                <button class="btn btn-primary btn-sm me-2" 
+                        onclick="editEvent({{ event.id }}, '{{ event.event_type }}', '{{ event.start_time|strftime('%Y-%m-%dT%H:%M') }}', '{{ event.duration }}', '{{ event.notes|escape }}')"
+                        style="height: fit-content;">
+                    {{ render_icon('pencil') }}
+                </button>
+                <button class="btn btn-danger btn-sm" 
+                        onclick="deleteEvent({{ event.id }})"
+                        style="height: fit-content;">
+                    {{ render_icon('trash') }}
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- 将原有的链接改为按钮 -->
+    <button onclick="goToAnalysis()" class="btn btn-info mt-3">生成AI建议</button>
+</div>
+
+<!-- 修改AI分析按钮，添加hours参数 -->
+<script>
+function goToAnalysis() {
+    const hours = document.getElementById('timeRange').value;
+    window.location.href = `/analyze?hours=${hours}&new=true`;
+}
+</script>
+
+<script>
+function submitEvent() {
+    const submitBtn = document.querySelector('button[type="submit"]');
+    const editId = submitBtn.getAttribute('data-edit-id');
+    const formData = new FormData();
+    
+    formData.append('type', document.getElementById('type').value);
+    formData.append('time', document.getElementById('eventTime').value);
+    formData.append('duration', document.getElementById('duration').value);
+    formData.append('notes', document.getElementById('notes').value);
+    
+    const url = editId ? `/edit_event/${editId}` : '/add_event';
+    const method = editId ? 'PUT' : 'POST';
+    
+    fetch(url, {
+        method: method,
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        }
+    })
+    .catch(error => console.error('Error:', error));
+    
+    return false;
+}
+
+function deleteEvent(eventId) {
+    if (confirm('确定要删除这条记录吗？')) {
+        fetch(`/delete_event/${eventId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+}
+
+function updateTimeRange() {
+    const hours = document.getElementById('timeRange').value;
+    // 存储选择的时间范围到 localStorage
+    localStorage.setItem('selectedHours', hours);
+    // 刷新页面以更新时间轴
+    window.location.href = `/?hours=${hours}`;
+}
+
+function updateFormByType() {
+    const type = document.getElementById('type').value;
+    const durationInput = document.getElementById('duration');
+    const durationGroup = document.getElementById('durationGroup');
+    const notesInput = document.getElementById('notes');
+    
+    // 定义不需要持续时间的事件类型
+    const noDurationEvents = ['换尿布', '剪指甲', '体温测量', '体重测量', '身高测量', '打疫苗'];
+    
+    // 控制持续时间输入框的显示/隐藏
+    if (noDurationEvents.includes(type)) {
+        durationGroup.style.display = 'none';
+        durationInput.value = '0'; // 设置默认值
+    } else {
+        durationGroup.style.display = 'block';
+        durationInput.value = '';
+    }
+    
+    // 根据事件类型设置提示
+    switch(type) {
+        case '吃奶':
+            durationInput.placeholder = "持续时间（一般15-30分钟）";
+            notesInput.placeholder = "备注（如：喝了多少ml、是否吐奶等）";
+            break;
+        case '睡眠':
+            durationInput.placeholder = "持续时间（分钟）";
+            notesInput.placeholder = "备注（如：哭闹情况、入睡质量等）";
+            break;
+        case '换尿布':
+            notesInput.placeholder = "备注（如：大小便情况、红疹等）";
+            break;
+        case '洗澡':
+            durationInput.placeholder = "持续时间（一般10-15分钟）";
+            notesInput.placeholder = "备注（如：水温、皮肤状况等）";
+            break;
+        case '剪指甲':
+            durationInput.placeholder = "持续时间（一般5-10分钟）";
+            notesInput.placeholder = "备注（如：手指/脚趾、是否完成等）";
+            break;
+            
+        // 健康相关
+        case '吃药':
+            durationInput.placeholder = "用药间隔（小时）";
+            notesInput.placeholder = "备注（药名、剂量、注意事项等）";
+            break;
+        case '体温测量':
+            durationInput.placeholder = "测量用时（一般1-2分钟）";
+            notesInput.placeholder = "备注（体温数值、精神状态等）";
+            break;
+        case '打疫苗':
+            durationInput.placeholder = "观察时间（分钟）";
+            notesInput.placeholder = "备注（疫苗名称、接种部位、反应等）";
+            break;
+            
+        // 成长记录
+        case '体重测量':
+            durationInput.placeholder = "测量用时（分钟）";
+            notesInput.placeholder = "备注（体重数值、生长曲线等）";
+            break;
+        case '身高测量':
+            durationInput.placeholder = "测量用时（分钟）";
+            notesInput.placeholder = "备注（身高数值、生长曲线等）";
+            break;
+            
+        // 互动活动
+        case '户外活动':
+            durationInput.placeholder = "活动时长（分钟）";
+            notesInput.placeholder = "备注（活动地点、天气情况等）";
+            break;
+        case '亲子游戏':
+            durationInput.placeholder = "活动时长（分钟）";
+            notesInput.placeholder = "备注（游戏内容、宝宝反应等）";
+            break;
+            
+        // 其他
+        default:
+            durationInput.placeholder = "持续时间（分钟）";
+            notesInput.placeholder = "备注（请详细描述事件）";
+    }
+}
+
+// 在type select的onchange事件中调用
+document.getElementById('type').onchange = updateFormByType;
+
+// 页面加载时设置选中的时间范围
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const hours = urlParams.get('hours') || localStorage.getItem('selectedHours') || '24';
+    document.getElementById('timeRange').value = hours;
+});
+
+function editEvent(id, type, time, duration, notes) {
+    // 填充表单
+    document.getElementById('type').value = type;
+    document.getElementById('eventTime').value = time;
+    document.getElementById('duration').value = duration;
+    document.getElementById('notes').value = notes;
+    
+    // 更新表单占位符
+    updateFormByType();
+    
+    // 修改提交按钮
+    const submitBtn = document.querySelector('button[type="submit"]');
+    submitBtn.textContent = '更新记录';
+    submitBtn.setAttribute('data-edit-id', id);
+    
+    // 滚动到表单
+    document.querySelector('form').scrollIntoView({ behavior: 'smooth' });
+}
+
+// 添加重置表单函数
+function resetForm() {
+    document.querySelector('form').reset();
+    const submitBtn = document.querySelector('button[type="submit"]');
+    submitBtn.textContent = '记录事件';
+    submitBtn.removeAttribute('data-edit-id');
+    updateFormByType();
+}
+</script>
+{% endblock %}

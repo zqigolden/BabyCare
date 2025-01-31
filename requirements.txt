@@ -1,0 +1,6 @@
+flask
+flask-sqlalchemy
+requests
+bootstrap-flask
+python-dotenv
+

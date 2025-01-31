@@ -1,0 +1,170 @@
+{% extends "bootstrap/base.html" %}
+
+{% block title %}AI 育儿分析报告{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+    
+    .page-header {
+        background: white;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .stats-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .analysis-card {
+        background: white;
+        border-radius: 10px;
+        padding: 2rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .ai-response {
+        font-size: 1.1rem;
+        line-height: 1.8;
+        color: #2c3e50;
+    }
+    
+    .control-panel {
+        position: sticky;
+        top: 1rem;
+        z-index: 100;
+    }
+    
+    @media (max-width: 768px) {
+        .stats-card, .analysis-card {
+            padding: 1rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- 控制面板 -->
+    <div class="control-panel bg-white p-3 rounded shadow-sm mb-4">
+        <div class="d-flex align-items-center justify-content-between">
+            <div>
+                <select class="form-select me-2" id="timeRange" style="width: auto;">
+                    <option value="24">最近24小时</option>
+                    <option value="48">最近48小时</option>
+                    <option value="72">最近3天</option>
+                    <option value="168">最近7天</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="refreshAnalysis(true)" id="analyzeBtn">
+                🔄 重新分析
+            </button>
+        </div>
+    </div>
+
+    <!-- 数据统计 -->
+    <div class="row">
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="stats-card">
+                <h6 class="text-muted mb-2">分析时间范围</h6>
+                <p class="h4 mb-0">最近{{ hours }}小时</p>
+                {% if analysis_time %}
+                <small class="text-muted">
+                    分析于: {{ analysis_time|strftime('%Y-%m-%d %H:%M') }}
+                </small>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="stats-card">
+                <h6 class="text-muted mb-2">喂养次数</h6>
+                <p class="h4 mb-0">{{ feed_count }}次</p>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="stats-card">
+                <h6 class="text-muted mb-2">总睡眠时间</h6>
+                <p class="h4 mb-0">{{ total_sleep }}小时</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI分析结果 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title d-flex justify-content-between align-items-center">
+                AI 分析建议
+                {% if analysis_time %}
+                <small class="text-muted">
+                    分析时间: {{ analysis_time|strftime('%Y-%m-%d %H:%M') }}
+                </small>
+                {% endif %}
+            </h5>
+            <div class="ai-response" id="aiResponse">
+                {{ analysis|safe if analysis else "暂无分析结果" }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 从URL获取hours参数
+function getHoursFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('hours') || '24';
+}
+
+// 设置选择器的值
+function setTimeRangeValue(hours) {
+    const select = document.getElementById('timeRange');
+    if (select) {
+        select.value = hours;
+        localStorage.setItem('selectedHours', hours);
+    }
+}
+
+// 刷新分析函数
+function refreshAnalysis(generateNew = false) {
+    const hours = document.getElementById('timeRange').value;
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    
+    // 设置loading状态
+    if (generateNew) {
+        analyzeBtn.disabled = true;
+        analyzeBtn.innerHTML = '分析中...';
+    }
+    
+    localStorage.setItem('selectedHours', hours);
+    window.location.href = `/analyze?hours=${hours}${generateNew ? '&new=true' : ''}`;
+}
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    const hours = getHoursFromUrl();
+    setTimeRangeValue(hours);
+    
+    // 如果URL中有new参数，表示正在生成新分析
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('new')) {
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        analyzeBtn.disabled = true;
+        analyzeBtn.innerHTML = '分析中...';
+    }
+});
+
+// 监听选择器变化
+document.getElementById('timeRange').addEventListener('change', function() {
+    refreshAnalysis(false);
+});
+</script>
+{% endblock %}

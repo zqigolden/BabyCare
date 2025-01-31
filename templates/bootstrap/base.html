@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 基础元数据 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, user-scalable=no">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    
+    <!-- 动态块定义 -->
+    <title>{% block title %}宝宝作息记录系统{% endblock %}</title>
+    
+    
+    <!-- 自定义样式块 -->
+    {% block styles %}
+    {{ bootstrap.load_css() }}
+    <style>
+        /* 移动端优先的响应式调整 */
+        body {
+            padding-top: 3.5rem;
+            background-color: #f8f9fa;
+            margin-bottom: 60px;
+        }
+
+        .container {
+            padding-bottom: 70px;
+        }
+        
+        /* 导航栏优化 */
+        .navbar-brand {
+            padding: 0.3rem 1rem;
+        }
+        
+        /* 触摸友好设计 */
+        .btn, .form-control {
+            min-height: 3rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        /* 大屏适配 */
+        @media (min-width: 768px) {
+            .dropdown-menu {
+                min-width: 15rem;
+            }
+            .form-inline .form-control {
+                width: 300px;
+            }
+        }
+
+        .footer {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            height: 60px;
+            line-height: 60px;
+            background-color: #f5f5f5;
+            text-align: center;
+            z-index: 1030;
+        }
+    </style>
+    {% endblock %}
+</head>
+<body>
+    <!-- 响应式导航栏 -->
+    <nav class="navbar navbar-expand-md navbar-dark bg-primary fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                👶 BabyCare
+            </a>
+            
+            <!-- 移动端折叠按钮 -->
+            <button class="navbar-toggler" type="button" 
+                    data-bs-toggle="collapse" 
+                    data-bs-target="#mainNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <!-- 导航项 -->
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">时间轴</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/analyze">AI分析</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <footer class="footer">
+            <div class="container">
+                <span class="text-muted">© 2025 BabyCare QiZhu https://github.com/zqigolden</span>
+            </div>
+        </footer>
+    </nav>
+
+    <!-- 主内容区 -->
+    <main class="container-fluid mt-4">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-10 col-xl-8">
+                {% block content %}
+                <!-- 子模板内容注入点 -->
+                {% endblock %}
+            </div>
+        </div>
+    </main>
+    {{ bootstrap.load_js() }}
+    {% block scripts %}
+    {% endblock %}
+</body>
+</html>
