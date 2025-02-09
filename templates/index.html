@@ -10,6 +10,8 @@
     <!-- 事件记录表单 -->
     <form class="mb-4" onsubmit="return submitEvent()">
         <select class="form-select mb-2" id="type">
+            <option value="事件">事件</option>
+
             <!-- 基础生理需求 -->
             <option value="吃奶">吃奶</option>
             <option value="睡眠">睡眠</option>
@@ -32,8 +34,6 @@
             <option value="户外活动">户外活动</option>
             <option value="亲子游戏">亲子游戏</option>
             
-            <!-- 其他 -->
-            <option value="其他">其他</option>
         </select>
         
         <!-- 添加时间选择器 -->
@@ -286,5 +286,14 @@ function resetForm() {
     submitBtn.removeAttribute('data-edit-id');
     updateFormByType();
 }
+</script>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    setLastVisitedPage('/');
+});
 </script>
 {% endblock %}

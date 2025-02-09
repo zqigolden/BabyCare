@@ -1,33 +1,125 @@
+from abc import ABC, abstractmethod
 from datetime import datetime
+import os
+from google import genai
 import requests
-from config import Config
+import logging
+from typing import List, Optional
 
 
-def analyze_events(events, hours=24, debug=False):
-    if not events:
-        return None
-        
-    # 获取宝宝年龄
-    birth_date = datetime(2024, 10, 25)  # 固定出生日期
-    days_old = (datetime.now() - birth_date).days
+class LLM_client(ABC):
+    @abstractmethod
+    def chat(self, messages):
+        pass
 
-    # 构造分析提示词
-    event_summaries = []
-    for event in events:
-        summary = f"- [{event.start_time.strftime('%m月%d日 %H:%M')}] {event.event_type}"
-        if event.duration:
-            summary += f" ({event.duration}分钟)"
-        if event.notes:
-            summary += f" 备注: {event.notes}"
-        event_summaries.append(summary)
+    def analyze(self, prompt):
+        return self.chat(prompt)
 
-    system_prompt = f"""
+
+class OpenAI_compatiable(LLM_client):
+    def __init__(
+        self,
+        api_key,
+        model_name,
+        api_endpoint="https://api.openai.com",
+        temperature=0.7,
+        top_p=0.95,
+        max_tokens=2048,
+    ):
+        self.api_key = api_key
+        self.model_name = model_name
+        self.api_endpoint = api_endpoint
+        self.temperature = temperature
+        self.top_p = top_p
+        self.max_tokens = max_tokens
+
+    def chat(self, messages):
+        url = f"{self.api_endpoint}/v1/chat/completions"
+        print(url)
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        payload = {
+            "model": self.model_name,
+            "messages": [{"role": "user", "content": messages}],
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "max_tokens": self.max_tokens,
+        }
+
+        response = requests.post(url, headers=headers, json=payload)
+        if response.status_code == 200:
+            return response.json()["choices"][0]["message"]["content"]
+        else:
+            raise Exception(f"API请求失败: {response.status_code}")
+
+
+class DeepSeek(OpenAI_compatiable):
+    def __init__(self):
+        super().__init__(
+            api_key=os.environ.get("DEEPSEEK_API_KEY"),
+            model_name="deepseek-chat",
+            api_endpoint="https://api.deepseek.com",
+        )
+
+
+class Gemini(LLM_client):
+    def __init__(self, temperature=0.2, top_p=0.8, max_tokens=65536):
+        self.api_key = os.environ.get("GEMINI_API_KEY")
+        self.client = genai.Client(api_key=self.api_key)
+
+        self.config = {
+            "temperature": temperature,
+            "top_p": top_p,
+            "max_output_tokens": max_tokens,
+        }
+        self.model = "gemini-2.0-flash-exp"
+
+    def chat(self, messages):
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=messages,
+            config=self.config,
+        )
+        return response.text
+
+
+def create_llm(provider="gemini"):
+    if provider == "gemini":
+        return Gemini()
+    elif provider == "deepseek":
+        return DeepSeek()
+    else:
+        raise ValueError(f"Unknown LLM provider: {provider}")
+
+
+def format_event_summary(event) -> str:
+    """格式化单个事件为字符串"""
+    summary = f"- [{event.start_time.strftime('%m月%d日 %H:%M')}] {event.event_type}"
+    if event.duration:
+        summary += f" ({event.duration}分钟)"
+    if event.notes:
+        summary += f" 备注: {event.notes}"
+    return summary
+
+
+def create_analysis_prompt(events: List, days_old: int, hours: int) -> str:
+    """创建分析提示"""
+    event_summaries = [format_event_summary(event) for event in events]
+    event_summaries = "\n".join(event_summaries)
+    return f"""
 您是一位专业的婴幼儿发展观察员，请基于以下结构化数据完成养育行为分析：
 
 [基础信息]
-·出生日期：{birth_date.strftime('%Y年%m月%d日')}（当前{days_old}日龄）
+·当前{days_old}日龄
 ·观察时段：最近{hours}小时活动记录
 ·数据特性：可能存在哺乳/睡眠/排泄等未记录项
+·分析基于家长提供的{len(events)}项记录，可能存在遗漏信息
+
+[事件列表]
+{event_summaries}
 
 [分析要求]
 1. 异常扫描
@@ -53,35 +145,32 @@ def analyze_events(events, hours=24, debug=False):
    - 重点关注：<span class="badge bg-warning">...</span>
 4. 时间序列数据可视化建议用<ul class="timeline">呈现
 
-请避免使用"危险""严重"等刺激性词汇，采用"建议关注""需要注意"等中性表达。所有结论需标注数据支撑依据，如"（基于近8小时3次哺乳记录）"。最后补充数据完整性声明："请注意本次分析基于家长提供的{len(events)}项记录，实际照护中请核实遗漏信息"
-
+不要包含markdown标签，不需要解释生成的内容，只需提供分析结果即可。
 """
 
-    user_prompt = "\n".join(event_summaries)
-    if debug:
-        return system_prompt + "\n" + user_prompt
-    try:
-        response = requests.post(
-            "https://api.deepseek.com/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {Config.OPENAI_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "deepseek-chat",
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}],
-                "temperature": 1.3,
-                "max_tokens": 800,
-            },
-        )
 
-        if response.status_code == 200:
-            return response.json()["choices"][0]["message"]["content"]
-        else:
-            return "抱歉，分析服务暂时不可用。"
+def analyze_events(
+    events: List,
+    birth_date: datetime,
+    hours: int = 24,
+    llm_provider: str = "gemini",
+    debug: bool = False,
+) -> Optional[str]:
+    """分析婴儿活动数据并提供建议"""
+    try:
+        if not events:
+            logging.warning("没有事件数据可供分析")
+            return None
+
+        days_old = (datetime.now() - birth_date).days
+        prompt = create_analysis_prompt(events, days_old, hours)
+
+        if debug:
+            logging.debug(f"分析提示:\n{prompt}")
+
+        llm = create_llm(llm_provider)
+        return llm.analyze(prompt)
 
     except Exception as e:
-        print(f"API调用错误: {e}")
-        return "分析过程中出现错误，请稍后再试。"
+        logging.error(f"分析过程出错: {str(e)}")
+        raise

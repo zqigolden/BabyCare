@@ -56,6 +56,23 @@
             text-align: center;
             z-index: 1030;
         }
+        
+        /* 事件表单布局 */
+        .event-form-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .event-form-row > * {
+            flex: 1;
+        }
+        
+        @media (max-width: 768px) {
+            .event-form-row {
+                flex-direction: column;
+            }
+        }
     </style>
     {% endblock %}
 </head>
@@ -78,10 +95,13 @@
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="/">时间轴</a>
+                        <a class="nav-link" href="/" onclick="setLastVisitedPage('/')">时间轴</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/analyze">AI分析</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/feeding">计时器</a>
                     </li>
                 </ul>
             </div>
@@ -100,11 +120,56 @@
                 {% block content %}
                 <!-- 子模板内容注入点 -->
                 {% endblock %}
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="rememberPage" 
+                           onchange="toggleRememberPage(this.checked)">
+                    <label class="form-check-label" for="rememberPage">记住上次访问的页面</label>
+                </div>
             </div>
         </div>
     </main>
     {{ bootstrap.load_js() }}
     {% block scripts %}
+    <script>
+    function setLastVisitedPage(path) {
+        // 当明确点击时间轴时，允许设置 '/' 为 lastVisitedPage
+        document.cookie = `lastVisitedPage=${path};path=/;max-age=604800`;
+    }
+
+    function getLastVisitedPage() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'lastVisitedPage' && value && value !== '/') {
+                return value;
+            }
+        }
+        return '/';
+    }
+
+    function toggleRememberPage(enabled) {
+        if (!enabled) {
+            // 清除 cookie
+            document.cookie = 'lastVisitedPage=;path=/;max-age=0';
+        } else {
+            // 设置当前页面为最后访问页面
+            setLastVisitedPage(window.location.pathname);
+        }
+        // 保存用户的选择
+        localStorage.setItem('rememberPage', enabled);
+    }
+
+    // 页面加载时检查用户设置
+    document.addEventListener('DOMContentLoaded', function() {
+        const rememberPage = localStorage.getItem('rememberPage') === 'true';
+        document.getElementById('rememberPage').checked = rememberPage;
+        
+        // 只在非根路径页面设置 lastVisitedPage
+        if (rememberPage && window.location.pathname !== '/') {
+            setLastVisitedPage(window.location.pathname);
+        }
+    });
+    </script>
     {% endblock %}
 </body>
 </html>

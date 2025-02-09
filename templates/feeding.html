@@ -50,6 +50,11 @@
             <p>左侧: <span id="leftTotal">0</span> 分钟</p>
             <p>右侧: <span id="rightTotal">0</span> 分钟</p>
             <p>最后喂养: <span id="lastSide">-</span></p>
+            {% if timer_state and timer_state.last_side %}
+            <div class="text-muted mb-3">
+                最后喂养: {{ timer_state.last_side|side_to_cn }}侧
+            </div>
+            {% endif %}
             <button class="btn btn-success" onclick="saveFeeding()">保存记录</button>
             <a href="/" class="btn btn-outline-secondary">返回主页</a>
         </div>
@@ -58,28 +63,65 @@
 
 <script>
 let timers = {
-    left: { running: false, time: 0 },
-    right: { running: false, time: 0 }
+    left: { running: false, time: 0, lastSync: 0 },
+    right: { running: false, time: 0, lastSync: 0 }
 };
 
-// 定期从服务器获取状态
-function updateFromServer() {
+let localTimer;
+
+function startLocalTimer() {
+    if (localTimer) return;
+    
+    localTimer = setInterval(() => {
+        ['left', 'right'].forEach(side => {
+            if (timers[side].running) {
+                timers[side].time++;
+                updateDisplay(side);
+                updateSummary();
+            }
+        });
+    }, 1000);
+}
+
+function stopLocalTimer() {
+    if (localTimer) {
+        clearInterval(localTimer);
+        localTimer = null;
+    }
+}
+
+function syncWithServer() {
     fetch('/timer/state')
         .then(response => response.json())
         .then(state => {
             // 更新计时器状态
             for (const [side, data] of Object.entries(state)) {
                 if (side !== 'last_side') {
+                    const localTime = timers[side].running ? 
+                        (timers[side].time + Math.floor((Date.now() - timers[side].lastSync) / 1000)) : 
+                        timers[side].time;
+                    
+                    // 如果时间差异超过2秒，使用服务器时间
+                    if (Math.abs(localTime - data.time) > 2) {
+                        timers[side].time = data.time;
+                    }
+                    
                     timers[side].running = data.running;
-                    timers[side].time = data.time;
+                    timers[side].lastSync = Date.now();
+                    
                     updateButtonState(side);
                     updateDisplay(side);
                 }
             }
-            // 更新最后喂养侧
             updateLastSide(state.last_side);
-            // 更新总结
             updateSummary();
+            
+            // 根据运行状态管理本地计时器
+            if (timers.left.running || timers.right.running) {
+                startLocalTimer();
+            } else {
+                stopLocalTimer();
+            }
         });
 }
 
@@ -90,7 +132,7 @@ function toggleTimer(side) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            updateFromServer();
+            syncWithServer();
         }
     });
 }
@@ -116,8 +158,16 @@ function updateDisplay(side) {
 }
 
 function updateLastSide(lastSide) {
-    document.getElementById('lastSide').textContent = 
-        lastSide ? `${lastSide}侧` : '-';
+    let sideText = '-';
+    if (lastSide) {
+        // 将 left/right 转换为中文
+        const sideMap = {
+            'left': '左',
+            'right': '右'
+        };
+        sideText = `${sideMap[lastSide]}侧`;
+    }
+    document.getElementById('lastSide').textContent = sideText;
 }
 
 function updateSummary() {
@@ -128,7 +178,7 @@ function updateSummary() {
     document.getElementById('rightTotal').textContent = rightMinutes;
 }
 
-// 添加单侧清零函数
+// 修改重置函数
 function resetSideTimer(side) {
     fetch(`/timer/reset/${side}`, {
         method: 'POST'
@@ -136,41 +186,75 @@ function resetSideTimer(side) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            updateFromServer();
+            syncWithServer();
         }
     });
 }
 
 function saveFeeding() {
+    // 检查是否有正在运行的计时器，并将其作为最后喂养侧
+    let lastSide = document.getElementById('lastSide').textContent;
+    if (timers.left.running) {
+        lastSide = '左侧';
+    } else if (timers.right.running) {
+        lastSide = '右侧';
+    }
+    
     const totalMinutes = Math.floor((timers.left.time + timers.right.time) / 60);
     const notes = `左侧: ${Math.floor(timers.left.time/60)}分钟, ` +
                  `右侧: ${Math.floor(timers.right.time/60)}分钟, ` +
-                 `最后喂养: ${document.getElementById('lastSide').textContent}`;
+                 `最后喂养: ${lastSide}`;
     
-    const formData = new FormData();
-    formData.append('type', '吃奶');
-    formData.append('duration', totalMinutes);
-    formData.append('notes', notes);
-    
-    fetch('/add_event', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(() => {
-        // 保存成功后重置计时器
-        return fetch('/timer/reset', {
-            method: 'POST'
-        });
-    })
-    .then(() => window.location.href = '/')
-    .catch(error => console.error('Error:', error));
+    // 如果有计时器在运行，先停止计时
+    const stopTimerPromises = [];
+    if (timers.left.running) {
+        stopTimerPromises.push(fetch('/timer/toggle/left', { method: 'POST' }));
+    }
+    if (timers.right.running) {
+        stopTimerPromises.push(fetch('/timer/toggle/right', { method: 'POST' }));
+    }
+
+    // 等待所有计时器停止后再保存
+    Promise.all(stopTimerPromises)
+        .then(() => {
+            const formData = new FormData();
+            formData.append('type', '吃奶');
+            formData.append('duration', totalMinutes);
+            formData.append('notes', notes);
+            
+            return fetch('/add_event', {
+                method: 'POST',
+                body: formData
+            });
+        })
+        .then(response => response.json())
+        .then(() => fetch('/timer/reset', { method: 'POST' }))
+        .then(() => window.location.href = '/')
+        .catch(error => console.error('Error:', error));
 }
 
-// 页面加载完成后开始定期更新
+// 修改页面加载时的初始化
 document.addEventListener('DOMContentLoaded', function() {
-    updateFromServer();
-    setInterval(updateFromServer, 1000);
+    syncWithServer();
+    
+    // 每30秒同步一次
+    setInterval(syncWithServer, 30000);
+    
+    // 页面可见性变化时同步
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            syncWithServer();
+        }
+    });
+});
+</script>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    setLastVisitedPage('/feeding');
 });
 </script>
 {% endblock %}
