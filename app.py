@@ -91,24 +91,35 @@ def delete_event(event_id):
 def edit_event(event_id):
     try:
         event = BabyEvent.query.get_or_404(event_id)
-
-        # 获取表单数据并处理duration的空值情况
-        duration_str = request.form.get("duration", "0")
-        duration = int(duration_str) if duration_str.strip() else 0
-
-        # 更新事件信息
-        event.event_type = request.form.get("type")
-        event.start_time = datetime.strptime(request.form.get("time"), "%Y-%m-%dT%H:%M")
+        
+        # 获取表单数据
+        event_type = request.form.get("type")
+        event_time = request.form.get("time")
+        duration = request.form.get("duration", "0")
+        notes = request.form.get("notes", "")
+        
+        # 数据验证
+        if not event_type or not event_time:
+            return jsonify({"success": False, "error": "类型和时间不能为空"}), 400
+            
+        # 转换持续时间
+        try:
+            duration = int(duration) if duration.strip() else 0
+        except ValueError:
+            return jsonify({"success": False, "error": "持续时间必须是有效的数字"}), 400
+            
+        # 更新事件
+        event.event_type = event_type
+        event.start_time = datetime.strptime(event_time, "%Y-%m-%dT%H:%M")
         event.duration = duration
-        event.notes = request.form.get("notes", "")
-
+        event.notes = notes
+        
         db.session.commit()
         return jsonify({"success": True})
-    except ValueError as e:
-        db.session.rollback()
-        return jsonify({"success": False, "error": "持续时间必须是有效的数字"}), 400
+        
     except Exception as e:
         db.session.rollback()
+        print(f"Error updating event: {str(e)}")  # 调试日志
         return jsonify({"success": False, "error": str(e)}), 500
 
 

@@ -154,9 +154,10 @@ function submitEvent() {
     
     formData.append('type', document.getElementById('type').value);
     formData.append('time', document.getElementById('eventTime').value);
-    formData.append('duration', document.getElementById('duration').value);
+    formData.append('duration', document.getElementById('duration').value || '0');
     formData.append('notes', document.getElementById('notes').value);
     
+    // 根据是否有 editId 决定是新建还是更新
     const url = editId ? `/edit_event/${editId}` : '/add_event';
     const method = editId ? 'PUT' : 'POST';
     
@@ -167,12 +168,17 @@ function submitEvent() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            location.reload();
+            window.location.reload();
+        } else {
+            alert(data.error || '操作失败');
         }
     })
-    .catch(error => console.error('Error:', error));
+    .catch(error => {
+        console.error('Error:', error);
+        alert('操作失败');
+    });
     
-    return false;
+    return false; // 防止表单默认提交
 }
 
 function deleteEvent(eventId) {
@@ -213,7 +219,6 @@ function updateFormByType() {
         durationInput.value = '0'; // 设置默认值
     } else {
         durationGroup.style.display = 'block';
-        durationInput.value = '';
     }
     
     // 根据事件类型设置提示
@@ -290,19 +295,16 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function editEvent(id, type, time, duration, notes) {
+    console.log('Editing event:', { id, type, time, duration, notes }); // 调试日志
+    
     // 填充表单
     document.getElementById('type').value = type;
-    updateFormByType();
     document.getElementById('eventTime').value = time;
+    document.getElementById('duration').value = duration || 0;
     document.getElementById('notes').value = notes;
-    const durationInput = document.getElementById('duration');
-    document.getElementById('duration').value = duration || 0;  // 如果 duration 为 null，使用 0
     
-    // 如果事件类型允许持续时间，则显示已保存的持续时间
-    const noDurationEvents = ['换尿布', '剪指甲', '体温测量', '体重测量', '身高测量', '打疫苗'];
-    if (!noDurationEvents.includes(type)) {
-        document.getElementById('durationGroup').style.display = 'block';
-    }
+    // 确保持续时间输入框的显示状态正确
+    updateFormByType();
     
     // 修改提交按钮
     const submitBtn = document.querySelector('button[type="submit"]');
