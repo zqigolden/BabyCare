@@ -1,62 +1,129 @@
 {% extends "bootstrap/base.html" %}
+{% from 'bootstrap5/utils.html' import render_icon %}
 {% block title %}喂奶记录{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h2>喂奶计时器</h2>
-    
-    <div class="row mt-4">
-        <!-- 左侧计时器 -->
-        <div class="col-6">
-            <div class="card">
-                <div class="card-body text-center">
-                    <h3>左侧</h3>
-                    <div class="display-4" id="leftTimer">00:00</div>
-                    <div class="btn-group mt-3">
-                        <button class="btn btn-lg btn-primary" id="leftBtn" onclick="toggleTimer('left')">
-                            开始
-                        </button>
-                        <button class="btn btn-lg btn-outline-secondary" onclick="resetSideTimer('left')">
-                            清零
-                        </button>
-                    </div>
-                </div>
-            </div>
+<div class="container py-4">
+    <!-- 修改提示区域，添加固定定位样式 -->
+    <style>
+    .alert-floating {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1050;
+        min-width: 300px;
+    }
+    </style>
+
+    <!-- 修改提示区域的 HTML -->
+    <div id="saveNotification" class="alert alert-success alert-dismissible fade d-none alert-floating" role="alert">
+        {{ render_icon('check-circle') }} 保存成功！正在跳转...
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
+    <div id="lastSide" class="d-none">-</div>
+    <!-- 最后喂养信息卡片 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            {{ render_icon('info-circle') }} 上次喂奶信息
         </div>
-        <!-- 右侧计时器 -->
-        <div class="col-6">
-            <div class="card">
-                <div class="card-body text-center">
-                    <h3>右侧</h3>
-                    <div class="display-4" id="rightTimer">00:00</div>
-                    <div class="btn-group mt-3">
-                        <button class="btn btn-lg btn-primary" id="rightBtn" onclick="toggleTimer('right')">
-                            开始
-                        </button>
-                        <button class="btn btn-lg btn-outline-secondary" onclick="resetSideTimer('right')">
-                            清零
-                        </button>
+        <div class="card-body">
+            {% if last_feeding.time %}
+                <div class="row">
+                    <div class="col-md-4">
+                        <p class="mb-2">
+                            {{ render_icon('clock') }}
+                            距离上次: 
+                            <strong>{{ last_feeding.interval }}</strong>
+                        </p>
+                    </div>
+                    <div class="col-md-4">
+                        <p class="mb-2">
+                            {{ render_icon('arrow-left-right') }}
+                            最后喂养: 
+                            <strong>{{ last_feeding.last_side }}</strong>
+                        </p>
+                    </div>
+                    <div class="col-md-4">
+                        <p class="mb-2">
+                            {{ render_icon('hourglass-split') }}
+                            持续时间: 
+                            <strong>{{ last_feeding.duration }}分钟</strong>
+                        </p>
                     </div>
                 </div>
-            </div>
+                <small class="text-muted">
+                    开始于: {{ last_feeding.time.strftime('%H:%M') }}
+                </small>
+            {% else %}
+                <p class="text-muted mb-0">暂无记录</p>
+            {% endif %}
         </div>
     </div>
 
-    <!-- 总结卡片 -->
-    <div class="card mt-4">
+    <!-- 计时器卡片 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            {{ render_icon('clock-history') }} 计时器
+        </div>
         <div class="card-body">
-            <h4>本次喂奶总结</h4>
-            <p>总时长: <span id="totalTime">0</span> 分钟</p>
-            <p>左侧: <span id="leftTotal">0</span> 分钟</p>
-            <p>右侧: <span id="rightTotal">0</span> 分钟</p>
-            <p>最后喂养: <span id="lastSide">-</span></p>
-            {% if timer_state and timer_state.last_side %}
-            <div class="text-muted mb-3">
-                最后喂养: {{ timer_state.last_side|side_to_cn }}侧
+            <div class="row g-4">
+                <!-- 左侧计时器 -->
+                <div class="col-6">
+                    <div class="text-center">
+                        <h5 class="card-title mb-3">左侧</h5>
+                        <div class="display-4 mb-3" id="leftTimer">00:00</div>
+                        <div class="btn-group">
+                            <button class="btn btn-lg btn-primary" id="leftBtn" onclick="toggleTimer('left')">
+                                开始
+                            </button>
+                            <button class="btn btn-lg btn-outline-secondary" onclick="resetSideTimer('left')">
+                                清零
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧计时器 -->
+                <div class="col-6">
+                    <div class="text-center">
+                        <h5 class="card-title mb-3">右侧</h5>
+                        <div class="display-4 mb-3" id="rightTimer">00:00</div>
+                        <div class="btn-group">
+                            <button class="btn btn-lg btn-primary" id="rightBtn" onclick="toggleTimer('right')">
+                                开始
+                            </button>
+                            <button class="btn btn-lg btn-outline-secondary" onclick="resetSideTimer('right')">
+                                清零
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
-            {% endif %}
-            <button class="btn btn-success" onclick="saveFeeding()">保存记录</button>
-            <a href="/" class="btn btn-outline-secondary">返回主页</a>
+
+            <!-- 汇总信息 -->
+            <hr class="my-4">
+            <div class="row text-center g-3">
+                <div class="col-4">
+                    <h6 class="text-muted mb-2">左侧总计</h6>
+                    <p class="h4 mb-0" id="leftTotal">0分钟</p>
+                </div>
+                <div class="col-4">
+                    <h6 class="text-muted mb-2">右侧总计</h6>
+                    <p class="h4 mb-0" id="rightTotal">0分钟</p>
+                </div>
+                <div class="col-4">
+                    <h6 class="text-muted mb-2">总时长</h6>
+                    <p class="h4 mb-0" id="totalTime">0分钟</p>
+                </div>
+            </div>
+            
+            <div class="text-center mt-4">
+                <button class="btn btn-success btn-lg" onclick="saveFeeding()">
+                    {{ render_icon('save') }} 保存记录
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -97,15 +164,7 @@ function syncWithServer() {
             // 更新计时器状态
             for (const [side, data] of Object.entries(state)) {
                 if (side !== 'last_side') {
-                    const localTime = timers[side].running ? 
-                        (timers[side].time + Math.floor((Date.now() - timers[side].lastSync) / 1000)) : 
-                        timers[side].time;
-                    
-                    // 如果时间差异超过2秒，使用服务器时间
-                    if (Math.abs(localTime - data.time) > 2) {
-                        timers[side].time = data.time;
-                    }
-                    
+                    timers[side].time = data.time;
                     timers[side].running = data.running;
                     timers[side].lastSync = Date.now();
                     
@@ -170,12 +229,26 @@ function updateLastSide(lastSide) {
     document.getElementById('lastSide').textContent = sideText;
 }
 
+function formatDuration(minutes) {
+    if (minutes < 60) {
+        return `${minutes}分钟`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes > 0 ? 
+        `${hours}小时${remainingMinutes}分钟` : 
+        `${hours}小时`;
+}
+
+// 修改更新汇总信息的函数
 function updateSummary() {
     const leftMinutes = Math.floor(timers.left.time / 60);
     const rightMinutes = Math.floor(timers.right.time / 60);
-    document.getElementById('totalTime').textContent = leftMinutes + rightMinutes;
-    document.getElementById('leftTotal').textContent = leftMinutes;
-    document.getElementById('rightTotal').textContent = rightMinutes;
+    const totalMinutes = leftMinutes + rightMinutes;
+    
+    document.getElementById('totalTime').innerHTML = formatDuration(totalMinutes);
+    document.getElementById('leftTotal').innerHTML = formatDuration(leftMinutes);
+    document.getElementById('rightTotal').innerHTML = formatDuration(rightMinutes);
 }
 
 // 修改重置函数
@@ -229,18 +302,36 @@ function saveFeeding() {
         })
         .then(response => response.json())
         .then(() => fetch('/timer/reset', { method: 'POST' }))
-        .then(() => window.location.href = '/')
+        .then(() => {
+            // 显示提示
+            const saveNotification = document.getElementById('saveNotification');
+            saveNotification.classList.remove('d-none');
+            saveNotification.classList.add('show');
+
+            // 2秒后隐藏提示并跳转
+            setTimeout(() => {
+                saveNotification.classList.remove('show');
+                saveNotification.classList.add('d-none');
+                setLastVisitedPage('/');
+                window.location.href = '/';
+            }, 2000);
+        })
         .catch(error => console.error('Error:', error));
 }
 
 // 修改页面加载时的初始化
 document.addEventListener('DOMContentLoaded', function() {
+    // 初始化显示
+    updateDisplay('left');
+    updateDisplay('right');
+    updateSummary();
+    
+    // 同步服务器状态
     syncWithServer();
     
-    // 每30秒同步一次
+    // 设置定期同步
     setInterval(syncWithServer, 30000);
     
-    // 页面可见性变化时同步
     document.addEventListener('visibilitychange', function() {
         if (!document.hidden) {
             syncWithServer();

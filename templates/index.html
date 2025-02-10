@@ -79,18 +79,48 @@
         {% for event in events %}
         <div class="list-group-item d-flex justify-content-between align-items-start">
             <div>
-                <h5>{{ event.event_type }}</h5>
-                <small>{{ event.start_time|strftime('%Y-%m-%d %H:%M') }}</small>
-                {% if event.duration|convert_int > 0 %}
-                    <small class="ms-2">
-                        <i class="bi bi-clock"></i> {{ event.duration }}分钟
-                    </small>
-                {% endif %}
+                <h5>
+                    {% if event.event_type == '吃奶' %}
+                        {{ render_icon('cup-hot') }}
+                    {% elif event.event_type == '睡眠' %}
+                        {{ render_icon('moon') }}
+                    {% else %}
+                        {{ render_icon('calendar-event') }}
+                    {% endif %}
+                    {{ event.event_type }}
+                </h5>
+                <small>
+                    {{ render_icon('clock') }}
+                    {% if event.duration|convert_int > 0 %}
+                        {{ event.start_time|strftime('%m-%d') }}
+                        {{ event.start_time|strftime('%H:%M') }} - {{ event.end_time|strftime('%H:%M') }}
+                        {% if event.start_time.date() != event.end_time.date() %}
+                            <span class="badge bg-secondary">跨天</span>
+                        {% endif %}
+                        <span class="ms-2">
+                            {{ render_icon('hourglass-split') }} 
+                            {% if event.duration >= 60 %}
+                                {{ (event.duration / 60)|int }}小时
+                                {% if event.duration % 60 > 0 %}
+                                    {{ event.duration % 60 }}分钟
+                                {% endif %}
+                            {% else %}
+                                {{ event.duration }}分钟
+                            {% endif %}
+                        </span>
+                    {% else %}
+                        {{ event.start_time|strftime('%m-%d %H:%M') }}
+                    {% endif %}
+                </small>
                 <p class="mb-0">{{ event.notes }}</p>
             </div>
             <div>
                 <button class="btn btn-primary btn-sm me-2" 
-                        onclick="editEvent({{ event.id }}, '{{ event.event_type }}', '{{ event.start_time|strftime('%Y-%m-%dT%H:%M') }}', '{{ event.duration }}', '{{ event.notes|escape }}')"
+                        onclick="editEvent({{ event.id }}, 
+                                         '{{ event.event_type }}', 
+                                         '{{ event.start_time|strftime('%Y-%m-%dT%H:%M') }}', 
+                                         {{ event.duration }}, 
+                                         '{{ event.notes|escape }}')"
                         style="height: fit-content;">
                     {{ render_icon('pencil') }}
                 </button>
@@ -262,12 +292,17 @@ document.addEventListener('DOMContentLoaded', function() {
 function editEvent(id, type, time, duration, notes) {
     // 填充表单
     document.getElementById('type').value = type;
-    document.getElementById('eventTime').value = time;
-    document.getElementById('duration').value = duration;
-    document.getElementById('notes').value = notes;
-    
-    // 更新表单占位符
     updateFormByType();
+    document.getElementById('eventTime').value = time;
+    document.getElementById('notes').value = notes;
+    const durationInput = document.getElementById('duration');
+    document.getElementById('duration').value = duration || 0;  // 如果 duration 为 null，使用 0
+    
+    // 如果事件类型允许持续时间，则显示已保存的持续时间
+    const noDurationEvents = ['换尿布', '剪指甲', '体温测量', '体重测量', '身高测量', '打疫苗'];
+    if (!noDurationEvents.includes(type)) {
+        document.getElementById('durationGroup').style.display = 'block';
+    }
     
     // 修改提交按钮
     const submitBtn = document.querySelector('button[type="submit"]');

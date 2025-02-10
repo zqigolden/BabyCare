@@ -48,6 +48,12 @@ def index():
         .all()
     )
 
+    for event in events:
+        if event.duration:
+            # 数据库存储的是结束时间，计算开始时间
+            event.end_time = event.start_time
+            event.start_time = event.end_time - timedelta(minutes=event.duration)
+
     return render_template(
         "index.html", events=events, datetime=datetime
     )  # 传递datetime对象
@@ -165,9 +171,47 @@ def ai_analysis():
     )
 
 
+def format_time_interval(minutes):
+    """将分钟数转换为更易读的时间格式"""
+    if minutes < 60:
+        return f"{minutes}分钟"
+    hours = minutes // 60
+    remaining_minutes = minutes % 60
+    if remaining_minutes == 0:
+        return f"{hours}小时"
+    return f"{hours}小时{remaining_minutes}分钟"
+
 @app.route("/feeding")
 def feeding():
-    return render_template("feeding.html")
+    # 获取最后一次喂奶事件
+    last_feeding = BabyEvent.query.filter_by(
+        event_type='吃奶'
+    ).order_by(BabyEvent.start_time.desc()).first()
+    
+    last_feeding_info = {
+        'time': None,
+        'duration': None,
+        'last_side': None,
+        'interval': None
+    }
+    
+    if last_feeding:
+        feeding_details = parse_feeding_notes(last_feeding.notes)
+        total_duration = feeding_details['left'] + feeding_details['right']
+        interval_minutes = int((datetime.now() - last_feeding.start_time).total_seconds() / 60)
+        
+        last_feeding_info.update({
+            'time': last_feeding.start_time,
+            'duration': total_duration,
+            'last_side': feeding_details['last_side'],
+            'interval': format_time_interval(interval_minutes)
+        })
+    
+    return render_template(
+        'feeding.html',
+        timer_state=get_timer_state(),
+        last_feeding=last_feeding_info
+    )
 
 
 @app.route("/timer/toggle/<side>", methods=["POST"])
@@ -258,6 +302,31 @@ def convert_int(value):
 @app.template_filter("side_to_cn")
 def side_to_cn(side):
     return {"left": "左", "right": "右"}.get(side, "")
+
+
+def parse_feeding_notes(notes: str) -> dict:
+    """解析喂奶事件的备注信息"""
+    result = {
+        'left': 0,
+        'right': 0,
+        'last_side': None
+    }
+    if not notes:
+        return result
+        
+    try:
+        # 解析类似 "左侧: 30分钟, 右侧: 30分钟, 最后喂养: 右侧" 的字符串
+        parts = notes.split(', ')
+        for part in parts:
+            if '左侧:' in part:
+                result['left'] = int(part.split('左侧:')[1].strip().replace('分钟', ''))
+            elif '右侧:' in part:
+                result['right'] = int(part.split('右侧:')[1].strip().replace('分钟', ''))
+            elif '最后喂养:' in part:
+                result['last_side'] = part.split('最后喂养:')[1].strip()
+    except:
+        pass
+    return result
 
 
 if __name__ == "__main__":
