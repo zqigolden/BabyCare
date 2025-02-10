@@ -9,50 +9,75 @@
     
     <!-- 事件记录表单 -->
     <form class="mb-4" onsubmit="return submitEvent()">
-        <select class="form-select mb-2" id="type">
-            <option value="事件">事件</option>
+        <!-- 事件类型 -->
+        <div class="row mb-3 align-items-center">
+            <label for="type" class="col-sm-2 col-form-label">事件类型：</label>
+            <div class="col-sm-10">
+                <select class="form-select" id="type" onchange="updateFormByType()">
+                    <option value="事件">事件</option>
 
-            <!-- 基础生理需求 -->
-            <option value="吃奶">吃奶</option>
-            <option value="睡眠">睡眠</option>
-            <option value="换尿布">换尿布</option>
-            
-            <!-- 卫生护理 -->
-            <option value="洗澡">洗澡</option>
-            <option value="剪指甲">剪指甲</option>
-            
-            <!-- 健康相关 -->
-            <option value="吃药">吃药</option>
-            <option value="体温测量">体温测量</option>
-            <option value="打疫苗">打疫苗</option>
-            
-            <!-- 成长记录 -->
-            <option value="体重测量">体重测量</option>
-            <option value="身高测量">身高测量</option>
-            
-            <!-- 互动活动 -->
-            <option value="户外活动">户外活动</option>
-            <option value="亲子游戏">亲子游戏</option>
-            
-        </select>
-        
-        <!-- 添加时间选择器 -->
-        <input type="datetime-local" class="form-control mb-2" 
-               id="eventTime" 
-               max="{{ datetime.now().strftime('%Y-%m-%dT%H:%M') }}">
-        
-        <div id="durationGroup">
-            <input type="number" class="form-control mb-2" 
-                   id="duration" placeholder="持续时间（分钟）">
+                    <!-- 基础生理需求 -->
+                    <option value="吃奶">吃奶</option>
+                    <option value="睡眠">睡眠</option>
+                    <option value="换尿布">换尿布</option>
+                    
+                    <!-- 卫生护理 -->
+                    <option value="洗澡">洗澡</option>
+                    <option value="剪指甲">剪指甲</option>
+                    
+                    <!-- 健康相关 -->
+                    <option value="吃药">吃药</option>
+                    <option value="体温测量">体温测量</option>
+                    <option value="打疫苗">打疫苗</option>
+                    
+                    <!-- 成长记录 -->
+                    <option value="体重测量">体重测量</option>
+                    <option value="身高测量">身高测量</option>
+                    
+                    <!-- 互动活动 -->
+                    <option value="户外活动">户外活动</option>
+                    <option value="亲子游戏">亲子游戏</option>
+                    
+                </select>
+            </div>
         </div>
         
-        <textarea class="form-control mb-2" 
-                  id="notes" placeholder="备注"></textarea>
+        <!-- 结束时间 -->
+        <div class="row mb-3 align-items-center">
+            <label for="eventTime" class="col-sm-2 col-form-label">结束时间：</label>
+            <div class="col-sm-10">
+                <input type="datetime-local" class="form-control" 
+                       id="eventTime" 
+                       max="{{ datetime.now().strftime('%Y-%m-%dT%H:%M') }}">
+            </div>
+        </div>
         
-        <!-- 在表单提交按钮旁添加 -->
-        <div class="btn-group">
-            <button type="submit" class="btn btn-primary">记录事件</button>
-            <button type="button" class="btn btn-secondary" onclick="resetForm()">取消</button>
+        <!-- 持续时间 -->
+        <div class="row mb-3 align-items-center" id="durationGroup">
+            <label for="duration" class="col-sm-2 col-form-label">持续时间(分钟)：</label>
+            <div class="col-sm-10">
+                <input type="number" class="form-control" 
+                       id="duration" placeholder="持续时间（分钟）">
+            </div>
+        </div>
+        
+        <!-- 备注 -->
+        <div class="row mb-3 align-items-center">
+            <label for="notes" class="col-sm-2 col-form-label">备注：</label>
+            <div class="col-sm-10">
+                <textarea class="form-control" 
+                          id="notes" placeholder="备注"></textarea>
+            </div>
+        </div>
+        
+        <!-- 按钮组 -->
+        <div class="row">
+            <div class="col-sm-10 offset-sm-2">
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">记录事件</button>
+                    <button type="button" class="btn btn-secondary" onclick="resetForm()">取消</button>
+                </div>
+            </div>
         </div>
     </form>
 
@@ -295,7 +320,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function editEvent(id, type, time, duration, notes) {
-    console.log('Editing event:', { id, type, time, duration, notes }); // 调试日志
+    console.log('Editing event:', { id, type, time, duration, notes });
     
     // 填充表单
     document.getElementById('type').value = type;
@@ -311,8 +336,11 @@ function editEvent(id, type, time, duration, notes) {
     submitBtn.textContent = '更新记录';
     submitBtn.setAttribute('data-edit-id', id);
     
-    // 滚动到表单
-    document.querySelector('form').scrollIntoView({ behavior: 'smooth' });
+    // 滚动到页面顶部
+    window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
 }
 
 // 添加重置表单函数
