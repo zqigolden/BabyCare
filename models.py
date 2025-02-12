@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
@@ -14,3 +14,10 @@ class BabyEvent(db.Model):
     analysis_time = db.Column(db.DateTime)
     analysis_range = db.Column(db.Integer)  # 新增分析范围字段(小时)
     llm_provider = db.Column(db.String(20))
+
+
+class GrowthRecord(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, default=datetime.now(timezone.utc))
+    height = db.Column(db.Float, nullable=False)
+    weight = db.Column(db.Float, nullable=False)

@@ -1,0 +1,46 @@
+{% extends "bootstrap/base.html" %}
+{% block title %}宝宝生长记录{% endblock %}
+{% block content %}
+<div class="container">
+  <h1>宝宝生长记录</h1>
+  <form method="POST" action="{{ url_for('growth') }}">
+    <div class="mb-3">
+      <label for="date" class="form-label">日期</label>
+      <input type="date" class="form-control" id="date" name="date" required>
+    </div>
+    <div class="mb-3">
+      <label for="height" class="form-label">身高 (cm)</label>
+      <input type="number" step="0.1" class="form-control" id="height" name="height" required>
+    </div>
+    <div class="mb-3">
+      <label for="weight" class="form-label">体重 (kg)</label>
+      <input type="number" step="0.1" class="form-control" id="weight" name="weight" required>
+    </div>
+    <button type="submit" class="btn btn-primary">提交记录</button>
+  </form>
+  <hr>
+  <h2>记录列表</h2>
+  {% if records %}
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>日期</th>
+        <th>身高 (cm)</th>
+        <th>体重 (kg)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for record in records %}
+      <tr>
+        <td>{{ record.date }}</td>
+        <td>{{ record.height }}</td>
+        <td>{{ record.weight }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>当前没有记录。</p>
+  {% endif %}
+</div>
+{% endblock %}
